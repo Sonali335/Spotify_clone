@@ -2,7 +2,9 @@
 This project is a simplified Spotify Clone that demonstrates how to integrate with the Spotify Web API to fetch and display music data. The application allows users to browse music categories, explore playlists, and view details of individual tracks in a clean and responsive interface. It was developed as a hands-on project to practice API integration, asynchronous JavaScript (fetch/async-await), and DOM manipulation, while also focusing on building a smooth user experience with a Spotify-like design. Although it does not provide full Spotify functionality such as playing songs, it effectively showcases the ability to work with real-world APIs, manage authentication securely, and display dynamic data in a front-end application.
 
 # Demo
+```
 ![Demo Video](Phase_2(Project 2)/img/Spotify_clone.gif)
+```
 
 ## 🚀 Features
 
