@@ -3,7 +3,8 @@ This project is a simplified Spotify Clone that demonstrates how to integrate wi
 
 # Demo
 
-![Demo Video](Phase_2(Project 2)/img/Spotify_clone.gif)
+![Demo Video](Phase_2%28Project%202%29/img/Spotify_clone.gif)
+
 
 
 ## 🚀 Features
