@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Track Details</title>
+  <link rel="stylesheet" href="style/tracks.css" />
+  <link rel="stylesheet" href="style/track_details.css" />
+</head>
+<body>
+
+  <div class="header-bar">
+    <a href="javascript:history.back()" class="link back">Back</a>
+    <h1>Track Details</h1>
+    <a href="index.html" class="link home">Home</a>
+  </div>
+
+  <div id="track-detail" style="margin-top: 100px;"></div>
+
+  <script>
+/*
+  Note:
+  For security purposes, the Spotify Client ID and Client Secret are not included in this repository. 
+  Please create your own Spotify Developer account and register an application to obtain these credentials. 
+  Make sure to store them securely (e.g., using environment variables or a server-side authentication flow) 
+  instead of hardcoding them in the client-side code.
+*/
+
+    // Spotify API credentials
+    const clientId = "YOUR_CLIENT_ID"; // Replace with your actual Client ID
+    const clientSecret = "YOUR_CLIENT_SECRET"; // Replace with your actual Client Secret
+
+    // Get query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackId = urlParams.get("trackId");
+    const playlistId = urlParams.get("playlistId");
+
+    // Function to fetch Spotify access token
+    async function getAccessToken() {
+      const response = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
+      });
+      const data = await response.json();
+      return data.access_token;
+    }
+
+    // Load and display details of selected track
+    async function loadTrackDetails() {
+      const accessToken = await getAccessToken();
+
+      const response = await fetch(`https://api.spotify.com/v1/tracks/${trackId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      // Error handling
+      if (!response.ok) {
+        document.getElementById("track-detail").innerHTML = "<p>Error loading track details.</p>";
+        return;
+      }
+
+      const track = await response.json();
+      const album = track.album;
+      const releaseYear = album.release_date ? album.release_date.substring(0, 4) : "N/A";
+
+      // Show main track info
+      document.getElementById("track-detail").innerHTML = `
+        <div class="track-container">
+          <img src="${album.images[0]?.url || 'bg.jpg'}" alt="${track.name}" class="track-cover">
+          <div class="track-details">
+            <p>
+              <strong>Track:</strong> ${track.name}<br>
+              <strong>Artist(s):</strong> ${track.artists.map(a => a.name).join(", ")}<br>
+              <strong>Album:</strong> ${album.name}<br>
+              <strong>Release Year:</strong> ${releaseYear}<br>
+              <strong>Popularity:</strong> ${track.popularity}
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Create and fill recommendation section
+      const recommendationContainer = document.createElement("div");
+      recommendationContainer.className = "recommendation-container";
+
+      // Load similar tracks from the same artist
+      await loadArtistRecommendations(track.artists[0].id, track.id, recommendationContainer);
+
+      // Load tracks from the same playlist 
+      if (playlistId) {
+        await loadPlaylistRecommendations(playlistId, track.id, recommendationContainer);
+      }
+
+      // Add recommendations to the page
+      document.getElementById("track-detail").appendChild(recommendationContainer);
+    }
+
+    function createRecommendationElement(track, playlistId) {
+      const releaseYear = track.album?.release_date?.substring(0, 4) || "N/A";
+
+      return `
+        <div class="recommended-track-item">
+          <p><strong>${track.name}</strong><br>
+          ${track.artists.map(artist => artist.name).join(", ")} (${releaseYear})</p>
+          <button onclick="location.href='track_details.html?trackId=${track.id}${playlistId ? `&playlistId=${playlistId}` : ''}'">Show Track</button>
+        </div>
+      `;
+    }
+
+    // Get artist's top tracks and recommend (excluding current)
+    async function loadArtistRecommendations(artistId, currentTrackId, recommendationContainer) {
+      const accessToken = await getAccessToken();
+      const response = await fetch(`https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=US`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const data = await response.json();
+
+      const artistHeader = document.createElement("h2");
+      artistHeader.innerHTML = `More from ${data.tracks[0]?.artists[0]?.name}:`;
+      recommendationContainer.appendChild(artistHeader);
+
+      // Create a single div for all artist recommendations
+      const artistRecDiv = document.createElement("div");
+      artistRecDiv.className = "recommended_track";
+
+      // Collect HTML for each recommended track
+      const artistRecs = data.tracks
+        .filter(t => t.id !== currentTrackId)
+        .slice(0, 5)
+        .map(t => createRecommendationElement(t, playlistId))
+        .join("");
+
+      artistRecDiv.innerHTML = artistRecs;
+      recommendationContainer.appendChild(artistRecDiv);
+    }
+
+    // Get other tracks from the same playlist
+    async function loadPlaylistRecommendations(playlistId, currentTrackId, recommendationContainer) {
+      const accessToken = await getAccessToken();
+      const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const data = await response.json();
+
+      const playlistHeader = document.createElement("h2");
+      playlistHeader.innerHTML = `Other tracks from the same playlist:`;
+      recommendationContainer.appendChild(playlistHeader);
+
+      // div for all playlist recommendations
+      const playlistRecDiv = document.createElement("div");
+      playlistRecDiv.className = "recommended_track";
+
+      // Collect HTML for each recommended track
+      const playlistRecs = data.items
+        .map(item => item.track)
+        .filter(track => track?.id && track.id !== currentTrackId)
+        .slice(0, 5)
+        .map(track => createRecommendationElement(track, playlistId))
+        .join("");
+
+      playlistRecDiv.innerHTML = playlistRecs;
+      recommendationContainer.appendChild(playlistRecDiv);
+    }
+
+    // Call main function on load
+    loadTrackDetails();
+  </script>
+</body>
+</html>

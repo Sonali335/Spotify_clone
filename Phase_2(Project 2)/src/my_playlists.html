@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Playlists</title>
+  <link rel="stylesheet" href="style/my_playlists.css" />
+  <link rel="stylesheet" href="style/index.css" />
+</head>
+<body>
+  <div class="header-bar">
+    <a href="javascript:history.back()" class="link back">Back</a>
+    <h1>My Playlists</h1>
+    <a href="index.html" class="link home">Home</a>
+  </div>
+
+  <div class="create-playlist">
+    <h2>Create a New Playlist</h2>
+    <input type="text" id="playlist-name" placeholder="Enter playlist name..." /><br><br>
+    <button onclick="createPlaylist()">Create Playlist</button>
+  </div>
+
+  <div class="playlists" id="my-playlists"></div>
+
+  <div class="search-tracks" id="search-tracks" style="display: none;">
+    <h2>Add Tracks to <span id="current-playlist-name"></span></h2>
+    <div class="search-bar">
+      <input type="text" id="track-search-box" placeholder="Search for tracks..." />
+      <button onclick="searchTracks()">Search</button>
+    </div>
+    <div id="track-results"></div>
+  </div>
+
+  <script>
+/*
+  Note:
+  For security purposes, the Spotify Client ID and Client Secret are not included in this repository. 
+  Please create your own Spotify Developer account and register an application to obtain these credentials. 
+  Make sure to store them securely (e.g., using environment variables or a server-side authentication flow) 
+  instead of hardcoding them in the client-side code.
+*/
+
+    // Spotify API credentials
+    const clientId = "YOUR_CLIENT_ID"; // Replace with your actual Client ID
+    const clientSecret = "YOUR_CLIENT_SECRET"; // Replace with your actual Client Secret
+
+    // Local storage for playlists (simulating user-created playlists)
+    let myPlaylists = JSON.parse(localStorage.getItem("myPlaylists")) || [];
+
+    // Fetch Spotify access token
+    async function getAccessToken() {
+      const response = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
+      });
+      const data = await response.json();
+      return data.access_token;
+    }
+
+    // Create a new playlist
+    function createPlaylist() {
+      const name = document.getElementById("playlist-name").value.trim();
+      if (!name) {
+        alert("Please enter a playlist name.");
+        return;
+      }
+      const playlist = {
+        id: `local_${Date.now()}`,
+        name: name,
+        tracks: [],
+        image: "../img/pic.jpeg" 
+      };
+      myPlaylists.push(playlist);
+      localStorage.setItem("myPlaylists", JSON.stringify(myPlaylists));
+      document.getElementById("playlist-name").value = "";
+      displayPlaylists();
+    }
+
+    // Display all user-created playlists
+function displayPlaylists() {
+  const container = document.getElementById("my-playlists");
+  container.innerHTML = "";
+  myPlaylists.forEach(playlist => {
+    const div = document.createElement("div");
+    div.className = "playlist";
+    div.innerHTML = `
+      <img src="${playlist.image}" alt="${playlist.name}">
+      <p>${playlist.name}</p>
+      <button class="track-btn" onclick="openTrackSearch('${playlist.id}', '${playlist.name}')">Add Tracks</button>
+      <button class="track-btn" onclick="viewTracks('${playlist.id}')">View Tracks</button>
+      <button class="track-btn remove-btn" onclick="removePlaylist('${playlist.id}')">Remove Playlist</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// Remove a playlist
+function removePlaylist(playlistId) {
+  if (confirm("Are you sure you want to remove this playlist?")) {
+    myPlaylists = myPlaylists.filter(p => p.id !== playlistId);
+    localStorage.setItem("myPlaylists", JSON.stringify(myPlaylists));
+    displayPlaylists();
+    document.getElementById("search-tracks").style.display = "none";
+  }
+}
+
+    // Open track search section for a specific playlist
+    function openTrackSearch(playlistId, playlistName) {
+      document.getElementById("search-tracks").style.display = "block";
+      document.getElementById("current-playlist-name").textContent = playlistName;
+      document.getElementById("track-results").dataset.playlistId = playlistId;
+      document.getElementById("track-results").innerHTML = "";
+      document.getElementById("track-search-box").value = "";
+      window.scrollTo(0, document.getElementById("search-tracks").offsetTop);
+    }
+
+    // Search for tracks using Spotify API
+    async function searchTracks() {
+      const keyword = document.getElementById("track-search-box").value.trim();
+      if (!keyword) {
+        alert("Please enter a search term.");
+        return;
+      }
+      const accessToken = await getAccessToken();
+      const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(keyword)}&type=track`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const data = await response.json();
+      displayTrackResults(data.tracks.items);
+    }
+
+    // Display search results for tracks
+    function displayTrackResults(tracks) {
+      const container = document.getElementById("track-results");
+      container.innerHTML = "";
+      const playlistId = container.dataset.playlistId;
+      tracks.forEach(track => {
+        const div = document.createElement("div");
+        div.className = "track-result";
+        div.innerHTML = `
+          <p><strong>${track.name}</strong><br>${track.artists.map(a => a.name).join(", ")}</p>
+          <button onclick="addTrackToPlaylist('${playlistId}', '${track.id}', '${track.name}', '${track.artists[0].name}', '${track.album.images[0]?.url || '../../img/bg.jpg'}')">Add to Playlist</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Add a track to a playlist
+    function addTrackToPlaylist(playlistId, trackId, trackName, artistName, imageUrl) {
+      const playlist = myPlaylists.find(p => p.id === playlistId);
+      if (!playlist) return;
+      if (playlist.tracks.some(t => t.id === trackId)) {
+        alert("This track is already in the playlist.");
+        return;
+      }
+      playlist.tracks.push({ id: trackId, name: trackName, artist: artistName, image: imageUrl });
+      localStorage.setItem("myPlaylists", JSON.stringify(myPlaylists));
+      alert(`${trackName} added to ${playlist.name}!`);
+      displayTrackResults([]);
+    }
+
+    // View tracks in a playlist
+    function viewTracks(playlistId) {
+      const playlist = myPlaylists.find(p => p.id === playlistId);
+      if (!playlist) return;
+      const trackList = playlist.tracks.map(t => `
+        <div class="track-result">
+          <p><strong>${t.name}</strong><br>${t.artist}</p>
+          <button onclick="removeTrack('${playlistId}', '${t.id}')">Remove</button>
+        </div>
+      `).join("") || "<p>No tracks in this playlist.</p>";
+      document.getElementById("search-tracks").style.display = "block";
+      document.getElementById("current-playlist-name").textContent = playlist.name;
+      document.getElementById("track-results").innerHTML = trackList;
+      document.getElementById("track-results").dataset.playlistId = playlistId;
+      document.getElementById("track-search-box").value = "";
+    }
+
+    // Remove a track from a playlist
+    function removeTrack(playlistId, trackId) {
+      const playlist = myPlaylists.find(p => p.id === playlistId);
+      if (!playlist) return;
+      playlist.tracks = playlist.tracks.filter(t => t.id !== trackId);
+      localStorage.setItem("myPlaylists", JSON.stringify(myPlaylists));
+      viewTracks(playlistId);
+    }
+
+    // Initialize page
+    displayPlaylists();
+  </script>
+</body>
+</html>

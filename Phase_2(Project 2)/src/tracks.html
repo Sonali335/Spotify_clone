@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Playlist Details</title>
+  <link rel="stylesheet" href="style/tracks.css" />
+</head>
+<body>
+    
+  <div class="header-bar">
+    <a href="javascript:history.back()" class="link back">Back</a>
+    <h1 id="playlist-title">Playlist Details</h1>
+    <a href="index.html" class="link home">Home</a>
+  </div>
+
+  <div id="playlist-info"></div>
+
+  <h2>Tracks</h2>
+
+  <div class="search-bar">
+    <input type="text" id="search-box" placeholder="Search tracks..." />
+    <button onclick="searchTracks()">Search</button>
+  </div>
+
+  <div id="track-list"></div>
+
+  <script>
+/*
+  Note:
+  For security purposes, the Spotify Client ID and Client Secret are not included in this repository. 
+  Please create your own Spotify Developer account and register an application to obtain these credentials. 
+  Make sure to store them securely (e.g., using environment variables or a server-side authentication flow) 
+  instead of hardcoding them in the client-side code.
+*/
+
+    // Spotify API credentials
+    const clientId = "YOUR_CLIENT_ID"; // Replace with your actual Client ID
+    const clientSecret = "YOUR_CLIENT_SECRET"; // Replace with your actual Client Secret
+
+    // Get playlistId from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const playlistId = urlParams.get("playlistId");
+
+    // Store all fetched tracks for filtering/searching
+    let allTracks = [];
+
+    // Fetch access token from Spotify
+    async function getAccessToken() {
+      const response = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
+      });
+      const data = await response.json();
+      return data.access_token;
+    }
+
+    // Redirect to track details page
+    function viewTrack(trackId) {
+      window.location.href = `trackDetails.html?trackId=${trackId}`;
+    }
+
+    // Create HTML element for a single track
+    function createTrackElement(track) {
+      const releaseYear = track.album.release_date ? track.album.release_date.substring(0, 4) : "N/A";
+      const div = document.createElement("div");
+      div.className = "track";
+      div.innerHTML = `
+        <div class="track-left">
+          <p><strong>${track.name}</strong><br>
+          ${track.artists.map(artist => artist.name).join(", ")} (${releaseYear})</p>
+        </div>
+        <div class="track-right">
+          <button onclick="location.href='track_details.html?trackId=${track.id}&playlistId=${playlistId}'">Show Track</button>
+        </div>
+      `;
+      return div;
+    }
+
+    // Fetch and display playlist info and tracks
+    async function loadPlaylistDetails() {
+      const accessToken = await getAccessToken();
+      const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      // Show error if request fails
+      if (!response.ok) {
+        document.getElementById("playlist-info").innerHTML = "<p>Error loading playlist details.</p>";
+        return;
+      }
+
+      const data = await response.json();
+
+      // Set playlist name
+      document.getElementById("playlist-title").textContent = data.name;
+
+      // Show playlist info
+      document.getElementById("playlist-info").innerHTML = `
+        <div class="playlist-container">
+          <img src="${data.images[0]?.url || 'bg.jpg'}" alt="${data.name}" class="playlist-cover">
+          <div class="playlist-details">
+            <p>
+              <strong>Description:</strong> ${data.description || "No description available."}<br>
+              <strong>Owner:</strong> ${data.owner.display_name}<br>
+              <strong>Number of Tracks:</strong> ${data.tracks.total}<br>
+              <strong>Followers:</strong> ${data.followers.total.toLocaleString()}<br>
+              <strong>Type:</strong> ${data.type}
+            </p>
+          </div>
+        </div>
+      `;
+
+      const trackContainer = document.getElementById("track-list");
+      trackContainer.innerHTML = "";
+      allTracks = [];
+
+      // Loop through tracks and display them
+      data.tracks.items.forEach(item => {
+        const track = item.track;
+        if (track) {
+          allTracks.push(track);
+          const trackElement = createTrackElement(track);
+          trackContainer.appendChild(trackElement);
+        }
+      });
+    }
+
+    // Filter and show tracks based on search keyword
+    function searchTracks() {
+      const keyword = document.getElementById("search-box").value.toLowerCase();
+      const filteredTracks = allTracks.filter(track => 
+        track.name.toLowerCase().includes(keyword)
+      );
+
+      const trackContainer = document.getElementById("track-list");
+      trackContainer.innerHTML = "";
+
+      // Show message if no match found
+      if (filteredTracks.length === 0) {
+        trackContainer.innerHTML = "<p>No tracks found.</p>";
+        return;
+      }
+
+      // Display matched tracks
+      filteredTracks.forEach(track => {
+        const trackElement = createTrackElement(track);
+        trackContainer.appendChild(trackElement);
+      });
+    }
+
+    // Load playlist when page loads
+    loadPlaylistDetails();
+  </script>
+</body>
+</html>
